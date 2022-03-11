@@ -1,0 +1,905 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "connections_azurevm_name": {
+            "defaultValue": "azurevm",
+            "type": "String"
+        },
+        "connections_office365_name": {
+            "defaultValue": "office365",
+            "type": "String"
+        },
+        "metricAlerts_Web_Traffic_name": {
+            "defaultValue": "Web Traffic",
+            "type": "String"
+        },
+        "virtualMachines_BB_Backend_name": {
+            "defaultValue": "BB-Backend",
+            "type": "String"
+        },
+        "virtualMachines_BB_Frontend_name": {
+            "defaultValue": "BB-Frontend",
+            "type": "String"
+        },
+        "actionGroups_Notifications_name": {
+            "defaultValue": "Notifications",
+            "type": "String"
+        },
+        "storageAccounts_bbwebsitediag_name": {
+            "defaultValue": "bbwebsitediag2",
+            "type": "String"
+        },
+        "networkInterfaces_bb_backend903_name": {
+            "defaultValue": "bb-backend903",
+            "type": "String"
+        },
+        "virtualNetworks_BB_Website_vnet_name": {
+            "defaultValue": "BB-Website-vnet",
+            "type": "String"
+        },
+        "networkInterfaces_bb_frontend736_name": {
+            "defaultValue": "bb-frontend736",
+            "type": "String"
+        },
+        "publicIPAddresses_BB_Frontend_ip_name": {
+            "defaultValue": "BB-Frontend-ip",
+            "type": "String"
+        },
+        "networkSecurityGroups_BB_Backend_nsg_name": {
+            "defaultValue": "BB-Backend-nsg",
+            "type": "String"
+        },
+        "networkSecurityGroups_BB_Frontend_nsg_name": {
+            "defaultValue": "BB-Frontend-nsg",
+            "type": "String"
+        },
+        "schedules_shutdown_computevm_bb_backend_name": {
+            "defaultValue": "shutdown-computevm-bb-backend",
+            "type": "String"
+        },
+        "schedules_shutdown_computevm_bb_frontend_name": {
+            "defaultValue": "shutdown-computevm-bb-frontend",
+            "type": "String"
+        },
+        "LocalOSDiskType": {
+            "defaultValue": "Standard_LRS",
+            "allowedValues": [
+                "Standard_LRS",
+                "Premium_LRS"
+            ],
+            "Type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "type": "microsoft.insights/actionGroups",
+            "apiVersion": "2021-09-01",
+            "name": "[parameters('actionGroups_Notifications_name')]",
+            "location": "Global",
+            "properties": {
+                "groupShortName": "Notification",
+                "enabled": true,
+                "emailReceivers": [
+                    {
+                        "name": "NotifyMe_-EmailAction-",
+                        "emailAddress": "lewis.baker@nouveau.co.uk",
+                        "useCommonAlertSchema": false
+                    }
+                ],
+                "smsReceivers": [],
+                "webhookReceivers": [],
+                "eventHubReceivers": [],
+                "itsmReceivers": [],
+                "azureAppPushReceivers": [],
+                "automationRunbookReceivers": [],
+                "voiceReceivers": [],
+                "logicAppReceivers": [],
+                "azureFunctionReceivers": [],
+                "armRoleReceivers": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-11-01",
+            "name": "[parameters('networkSecurityGroups_BB_Backend_nsg_name')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "securityRules": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "apiVersion": "2020-11-01",
+            "name": "[parameters('networkSecurityGroups_BB_Frontend_nsg_name')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "AllowRDP",
+                        "properties": {
+                            "description": "Allows RDP for BB-FrontEnd from my Public IP.",
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "3389",
+                            "sourceAddressPrefix": "86.149.228.192",
+                            "destinationAddressPrefix": "10.1.0.4",
+                            "access": "Allow",
+                            "priority": 1000,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    },
+                    {
+                        "name": "AllowWebAccess",
+                        "properties": {
+                            "description": "Allows access to the BB Website.",
+                            "protocol": "TCP",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "80",
+                            "sourceAddressPrefix": "*",
+                            "destinationAddressPrefix": "10.1.0.4",
+                            "access": "Allow",
+                            "priority": 1010,
+                            "direction": "Inbound",
+                            "sourcePortRanges": [],
+                            "destinationPortRanges": [],
+                            "sourceAddressPrefixes": [],
+                            "destinationAddressPrefixes": []
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2020-11-01",
+            "name": "[parameters('publicIPAddresses_BB_Frontend_ip_name')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Basic",
+                "tier": "Regional"
+            },
+            "properties": {
+                "ipAddress": "20.49.179.39",
+                "publicIPAddressVersion": "IPv4",
+                "publicIPAllocationMethod": "Dynamic",
+                "idleTimeoutInMinutes": 4,
+                "dnsSettings": {
+                    "domainNameLabel": "bakersbeards",
+                    "fqdn": "bakersbeards.uksouth.cloudapp.azure.com"
+                },
+                "ipTags": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2020-11-01",
+            "name": "[parameters('virtualNetworks_BB_Website_vnet_name')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "10.1.0.0/16"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "default",
+                        "properties": {
+                            "addressPrefix": "10.1.0.0/24",
+                            "delegations": [],
+                            "privateEndpointNetworkPolicies": "Enabled",
+                            "privateLinkServiceNetworkPolicies": "Enabled"
+                        }
+                    }
+                ],
+                "virtualNetworkPeerings": [],
+                "enableDdosProtection": false
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "apiVersion": "2021-08-01",
+            "name": "[parameters('storageAccounts_bbwebsitediag_name')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "kind": "Storage",
+            "properties": {
+                "minimumTlsVersion": "TLS1_2",
+                "allowBlobPublicAccess": true,
+                "networkAcls": {
+                    "bypass": "AzureServices",
+                    "virtualNetworkRules": [],
+                    "ipRules": [],
+                    "defaultAction": "Allow"
+                },
+                "supportsHttpsTrafficOnly": true,
+                "encryption": {
+                    "services": {
+                        "file": {
+                            "keyType": "Account",
+                            "enabled": true
+                        },
+                        "blob": {
+                            "keyType": "Account",
+                            "enabled": true
+                        }
+                    },
+                    "keySource": "Microsoft.Storage"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[parameters('connections_azurevm_name')]",
+            "location": "[resourceGroup().location]",
+            "kind": "V1",
+            "properties": {
+                "displayName": "Lewis.Baker@nouveau.co.uk",
+                "statuses": [
+                    {
+                        "status": "Connected"
+                    }
+                ],
+                "customParameterValues": {},
+                "nonSecretParameterValues": {},
+                "createdTime": "2022-03-10T09:32:30.4616342Z",
+                "changedTime": "2022-03-11T09:00:00.2925479Z",
+                "api": {
+                    "name": "[parameters('connections_azurevm_name')]",
+                    "displayName": "Azure VM",
+                    "description": "Azure VM connector allows you to manage virtual machines.",
+                    "iconUri": "[concat('https://connectoricons-prod.azureedge.net/releases/v1.0.1555/1.0.1555.2715/', parameters('connections_azurevm_name'), '/icon.png')]",
+                    "brandColor": "#FFFFFF",
+                    "id": "[concat('/subscriptions/a3d6a631-9549-4cf8-af70-d343c53e403e/providers/Microsoft.Web/locations/uksouth/managedApis/', parameters('connections_azurevm_name'))]",
+                    "type": "Microsoft.Web/locations/managedApis"
+                },
+                "testLinks": []
+            }
+        },
+        {
+            "type": "Microsoft.Web/connections",
+            "apiVersion": "2016-06-01",
+            "name": "[parameters('connections_office365_name')]",
+            "location": "[resourceGroup().location]",
+            "kind": "V1",
+            "properties": {
+                "displayName": "Lewis.Baker@nouveau.co.uk",
+                "statuses": [
+                    {
+                        "status": "Connected"
+                    }
+                ],
+                "customParameterValues": {},
+                "nonSecretParameterValues": {},
+                "createdTime": "2022-03-10T09:35:30.9320159Z",
+                "changedTime": "2022-03-11T09:00:57.0671793Z",
+                "api": {
+                    "name": "[parameters('connections_office365_name')]",
+                    "displayName": "Office 365 Outlook",
+                    "description": "Microsoft Office 365 is a cloud-based service that is designed to help meet your organization's needs for robust security, reliability, and user productivity.",
+                    "iconUri": "[concat('https://connectoricons-prod.azureedge.net/releases/v1.0.1538/1.0.1538.2621/', parameters('connections_office365_name'), '/icon.png')]",
+                    "brandColor": "#0078D4",
+                    "id": "[concat('/subscriptions/a3d6a631-9549-4cf8-af70-d343c53e403e/providers/Microsoft.Web/locations/uksouth/managedApis/', parameters('connections_office365_name'))]",
+                    "type": "Microsoft.Web/locations/managedApis"
+                },
+                "testLinks": [
+                    {
+                        "requestUri": "[concat('https://management.azure.com:443/subscriptions/a3d6a631-9549-4cf8-af70-d343c53e403e/resourceGroups/BB-Website/providers/Microsoft.Web/connections/', parameters('connections_office365_name'), '/extensions/proxy/testconnection?api-version=2016-06-01')]",
+                        "method": "get"
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2021-11-01",
+            "name": "[parameters('virtualMachines_BB_Backend_name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_bb_backend903_name'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "Standard_D2as_v4"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "MicrosoftWindowsServer",
+                        "offer": "WindowsServer",
+                        "sku": "2016-datacenter-gensecond",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "osType": "Windows",
+                        "name": "[concat(parameters('virtualMachines_BB_Backend_name'), '_disk1_76969d9430ba4706badad3a60dd32d18')]",
+                        "createOption": "FromImage",
+                        "caching": "ReadWrite",
+                        "managedDisk": {
+                            "storageAccountType": "[parameters('LocalOSDiskType')]"
+                        },
+                        "deleteOption": "Delete"
+                    },
+                    "dataDisks": []
+                },
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachines_BB_Backend_name')]",
+                    "adminUsername": "LocalBakerMin",
+                    "adminPassword": "Logitech2022",
+                    "windowsConfiguration": {
+                        "provisionVMAgent": true,
+                        "enableAutomaticUpdates": true,
+                        "patchSettings": {
+                            "patchMode": "AutomaticByOS",
+                            "assessmentMode": "ImageDefault",
+                            "enableHotpatching": false
+                        }
+                    },
+                    "secrets": [],
+                    "allowExtensionOperations": true,
+                    "requireGuestProvisionSignal": true
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_bb_backend903_name'))]",
+                            "properties": {
+                                "deleteOption": "Detach"
+                            }
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines",
+            "apiVersion": "2021-11-01",
+            "name": "[parameters('virtualMachines_BB_Frontend_name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_bb_frontend736_name'))]"
+            ],
+            "properties": {
+                "hardwareProfile": {
+                    "vmSize": "Standard_D2as_v4"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "MicrosoftWindowsServer",
+                        "offer": "WindowsServer",
+                        "sku": "2016-datacenter-gensecond",
+                        "version": "latest"
+                    },
+                    "osDisk": {
+                        "osType": "Windows",
+                        "name": "[concat(parameters('virtualMachines_BB_Frontend_name'), '_disk1_17521f96dbf24978bb166ce90e34d119')]",
+                        "createOption": "FromImage",
+                        "caching": "ReadWrite",
+                        "managedDisk": {
+                            "storageAccountType": "[parameters('LocalOSDiskType')]"
+                        },
+                        "deleteOption": "Delete",
+                        "diskSizeGB": 127
+                    },
+                    "dataDisks": []
+                },
+                "osProfile": {
+                    "computerName": "[parameters('virtualMachines_BB_Frontend_name')]",
+                    "adminUsername": "LocalBakerMin",
+                    "adminPassword": "Logitech2022",
+                    "windowsConfiguration": {
+                        "provisionVMAgent": true,
+                        "enableAutomaticUpdates": true,
+                        "patchSettings": {
+                            "patchMode": "AutomaticByOS",
+                            "assessmentMode": "ImageDefault",
+                            "enableHotpatching": false
+                        }
+                    },
+                    "secrets": [],
+                    "allowExtensionOperations": true,
+                    "requireGuestProvisionSignal": true
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', parameters('networkInterfaces_bb_frontend736_name'))]",
+                            "properties": {
+                                "deleteOption": "Detach"
+                            }
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true
+                    }
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2021-11-01",
+            "name": "[concat(parameters('virtualMachines_BB_Frontend_name'), '/AzureNetworkWatcherExtension')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_BB_Frontend_name'))]"
+            ],
+            "properties": {
+                "autoUpgradeMinorVersion": true,
+                "publisher": "Microsoft.Azure.NetworkWatcher",
+                "type": "NetworkWatcherAgentWindows",
+                "typeHandlerVersion": "1.4"
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2021-11-01",
+            "name": "[concat(parameters('virtualMachines_BB_Backend_name'), '/Microsoft.Insights.VMDiagnosticsSettings')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_BB_Backend_name'))]"
+            ],
+            "properties": {
+                "autoUpgradeMinorVersion": true,
+                "publisher": "Microsoft.Azure.Diagnostics",
+                "type": "IaaSDiagnostics",
+                "typeHandlerVersion": "1.5",
+                "settings": {
+                    "StorageAccount": "bbwebsitediag",
+                    "xmlCfg": "[parameters('extensions_Microsoft_Insights_VMDiagnosticsSettings_xmlCfg')]"
+                },
+                "protectedSettings": {
+                    "storageAccountName": "[parameters('extensions_Microsoft_Insights_VMDiagnosticsSettings_storageAccountName')]",
+                    "storageAccountKey": "[parameters('extensions_Microsoft_Insights_VMDiagnosticsSettings_storageAccountKey')]",
+                    "storageAccountEndPoint": "[parameters('extensions_Microsoft_Insights_VMDiagnosticsSettings_storageAccountEndPoint')]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Compute/virtualMachines/extensions",
+            "apiVersion": "2021-11-01",
+            "name": "[concat(parameters('virtualMachines_BB_Frontend_name'), '/Microsoft.Insights.VMDiagnosticsSettings')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_BB_Frontend_name'))]"
+            ],
+            "properties": {
+                "autoUpgradeMinorVersion": true,
+                "publisher": "Microsoft.Azure.Diagnostics",
+                "type": "IaaSDiagnostics",
+                "typeHandlerVersion": "1.5",
+                "settings": {
+                    "StorageAccount": "bbwebsitediag2",
+                    "xmlCfg": "[parameters('extensions_Microsoft_Insights_VMDiagnosticsSettings_xmlCfg_1')]"
+                },
+                "protectedSettings": {
+                    "storageAccountName": "[parameters('extensions_Microsoft_Insights_VMDiagnosticsSettings_storageAccountName_1')]",
+                    "storageAccountKey": "[parameters('extensions_Microsoft_Insights_VMDiagnosticsSettings_storageAccountKey_1')]",
+                    "storageAccountEndPoint": "[parameters('extensions_Microsoft_Insights_VMDiagnosticsSettings_storageAccountEndPoint_1')]"
+                }
+            }
+        },
+        {
+            "type": "microsoft.devtestlab/schedules",
+            "apiVersion": "2018-09-15",
+            "name": "[parameters('schedules_shutdown_computevm_bb_backend_name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_BB_Backend_name'))]"
+            ],
+            "properties": {
+                "status": "Enabled",
+                "taskType": "ComputeVmShutdownTask",
+                "dailyRecurrence": {
+                    "time": "1900"
+                },
+                "timeZoneId": "UTC",
+                "notificationSettings": {
+                    "status": "Enabled",
+                    "timeInMinutes": 30,
+                    "emailRecipient": "Lewis.Baker@nouveau.co.uk",
+                    "notificationLocale": "en"
+                },
+                "targetResourceId": "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_BB_Backend_name'))]"
+            }
+        },
+        {
+            "type": "microsoft.devtestlab/schedules",
+            "apiVersion": "2018-09-15",
+            "name": "[parameters('schedules_shutdown_computevm_bb_frontend_name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_BB_Frontend_name'))]"
+            ],
+            "properties": {
+                "status": "Enabled",
+                "taskType": "ComputeVmShutdownTask",
+                "dailyRecurrence": {
+                    "time": "1900"
+                },
+                "timeZoneId": "UTC",
+                "notificationSettings": {
+                    "status": "Enabled",
+                    "timeInMinutes": 30,
+                    "emailRecipient": "Lewis.Baker@nouveau.co.uk",
+                    "notificationLocale": "en"
+                },
+                "targetResourceId": "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_BB_Frontend_name'))]"
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(parameters('networkSecurityGroups_BB_Frontend_nsg_name'), '/AllowRDP')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_BB_Frontend_nsg_name'))]"
+            ],
+            "properties": {
+                "description": "Allows RDP for BB-FrontEnd from my Public IP.",
+                "protocol": "TCP",
+                "sourcePortRange": "*",
+                "destinationPortRange": "3389",
+                "sourceAddressPrefix": "86.149.228.192",
+                "destinationAddressPrefix": "10.1.0.4",
+                "access": "Allow",
+                "priority": 1000,
+                "direction": "Inbound",
+                "sourcePortRanges": [],
+                "destinationPortRanges": [],
+                "sourceAddressPrefixes": [],
+                "destinationAddressPrefixes": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkSecurityGroups/securityRules",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(parameters('networkSecurityGroups_BB_Frontend_nsg_name'), '/AllowWebAccess')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_BB_Frontend_nsg_name'))]"
+            ],
+            "properties": {
+                "description": "Allows access to the BB Website.",
+                "protocol": "TCP",
+                "sourcePortRange": "*",
+                "destinationPortRange": "80",
+                "sourceAddressPrefix": "*",
+                "destinationAddressPrefix": "10.1.0.4",
+                "access": "Allow",
+                "priority": 1010,
+                "direction": "Inbound",
+                "sourcePortRanges": [],
+                "destinationPortRanges": [],
+                "sourceAddressPrefixes": [],
+                "destinationAddressPrefixes": []
+            }
+        },
+        {
+            "type": "Microsoft.Network/virtualNetworks/subnets",
+            "apiVersion": "2020-11-01",
+            "name": "[concat(parameters('virtualNetworks_BB_Website_vnet_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworks_BB_Website_vnet_name'))]"
+            ],
+            "properties": {
+                "addressPrefix": "10.1.0.0/24",
+                "delegations": [],
+                "privateEndpointNetworkPolicies": "Enabled",
+                "privateLinkServiceNetworkPolicies": "Enabled"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ],
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "properties": {
+                "cors": {
+                    "corsRules": []
+                },
+                "deleteRetentionPolicy": {
+                    "enabled": false
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/fileServices",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ],
+            "sku": {
+                "name": "Standard_LRS",
+                "tier": "Standard"
+            },
+            "properties": {
+                "protocolSettings": {
+                    "smb": {}
+                },
+                "cors": {
+                    "corsRules": []
+                },
+                "shareDeleteRetentionPolicy": {
+                    "enabled": true,
+                    "days": 7
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/queueServices",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ],
+            "properties": {
+                "cors": {
+                    "corsRules": []
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/tableServices",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ],
+            "properties": {
+                "cors": {
+                    "corsRules": []
+                }
+            }
+        },
+        {
+            "type": "microsoft.insights/metricAlerts",
+            "apiVersion": "2018-03-01",
+            "name": "[parameters('metricAlerts_Web_Traffic_name')]",
+            "location": "global",
+            "dependsOn": [
+                "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_BB_Frontend_name'))]",
+                "[resourceId('microsoft.insights/actionGroups', parameters('actionGroups_Notifications_name'))]"
+            ],
+            "properties": {
+                "description": "Alerts when total network bandwidth in is above 3MB.",
+                "severity": 3,
+                "enabled": true,
+                "scopes": [
+                    "[resourceId('Microsoft.Compute/virtualMachines', parameters('virtualMachines_BB_Frontend_name'))]"
+                ],
+                "evaluationFrequency": "PT5M",
+                "windowSize": "PT5M",
+                "criteria": {
+                    "allOf": [
+                        {
+                            "threshold": 10000000,
+                            "name": "Metric1",
+                            "metricNamespace": "microsoft.compute/virtualmachines",
+                            "metricName": "Network In",
+                            "operator": "GreaterThan",
+                            "timeAggregation": "Total",
+                            "criterionType": "StaticThresholdCriterion"
+                        }
+                    ],
+                    "odata.type": "Microsoft.Azure.Monitor.MultipleResourceMultipleMetricCriteria"
+                },
+                "autoMitigate": true,
+                "targetResourceType": "Microsoft.Compute/virtualMachines",
+                "targetResourceRegion": "uksouth",
+                "actions": [
+                    {
+                        "actionGroupId": "[resourceId('microsoft.insights/actionGroups', parameters('actionGroups_Notifications_name'))]",
+                        "webHookProperties": {}
+                    }
+                ]
+            }
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2020-11-01",
+            "name": "[parameters('networkInterfaces_bb_backend903_name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_BB_Website_vnet_name'), 'default')]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_BB_Backend_nsg_name'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAddress": "10.1.0.5",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_BB_Website_vnet_name'), 'default')]"
+                            },
+                            "primary": true,
+                            "privateIPAddressVersion": "IPv4"
+                        }
+                    }
+                ],
+                "dnsSettings": {
+                    "dnsServers": []
+                },
+                "enableAcceleratedNetworking": true,
+                "enableIPForwarding": false,
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_BB_Backend_nsg_name'))]"
+                }
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default/insights-logs-networksecuritygroupevent')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccounts_bbwebsitediag_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ],
+            "properties": {
+                "immutableStorageWithVersioning": {
+                    "enabled": false
+                },
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": false,
+                "publicAccess": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default/insights-logs-networksecuritygrouprulecounter')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccounts_bbwebsitediag_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ],
+            "properties": {
+                "immutableStorageWithVersioning": {
+                    "enabled": false
+                },
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": false,
+                "publicAccess": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/blobServices/containers",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default/wad-iis-logfiles')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/blobServices', parameters('storageAccounts_bbwebsitediag_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ],
+            "properties": {
+                "immutableStorageWithVersioning": {
+                    "enabled": false
+                },
+                "defaultEncryptionScope": "$account-encryption-key",
+                "denyEncryptionScopeOverride": false,
+                "publicAccess": "None"
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/tableServices/tables",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default/SchemasTable')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/tableServices', parameters('storageAccounts_bbwebsitediag_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/tableServices/tables",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default/WADDiagnosticInfrastructureLogsTable')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/tableServices', parameters('storageAccounts_bbwebsitediag_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/tableServices/tables",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default/WADDirectoriesTable')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/tableServices', parameters('storageAccounts_bbwebsitediag_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/tableServices/tables",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default/WADMetricsPT1HP10DV2S20220305')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/tableServices', parameters('storageAccounts_bbwebsitediag_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/tableServices/tables",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default/WADMetricsPT1MP10DV2S20220305')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/tableServices', parameters('storageAccounts_bbwebsitediag_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/tableServices/tables",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default/WADPerformanceCountersTable')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/tableServices', parameters('storageAccounts_bbwebsitediag_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts/tableServices/tables",
+            "apiVersion": "2021-08-01",
+            "name": "[concat(parameters('storageAccounts_bbwebsitediag_name'), '/default/WADWindowsEventLogsTable')]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Storage/storageAccounts/tableServices', parameters('storageAccounts_bbwebsitediag_name'), 'default')]",
+                "[resourceId('Microsoft.Storage/storageAccounts', parameters('storageAccounts_bbwebsitediag_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Network/networkInterfaces",
+            "apiVersion": "2020-11-01",
+            "name": "[parameters('networkInterfaces_bb_frontend736_name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_BB_Frontend_ip_name'))]",
+                "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_BB_Website_vnet_name'), 'default')]",
+                "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_BB_Frontend_nsg_name'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAddress": "10.1.0.4",
+                            "privateIPAllocationMethod": "Dynamic",
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('publicIPAddresses_BB_Frontend_ip_name'))]"
+                            },
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworks_BB_Website_vnet_name'), 'default')]"
+                            },
+                            "primary": true,
+                            "privateIPAddressVersion": "IPv4"
+                        }
+                    }
+                ],
+                "dnsSettings": {
+                    "dnsServers": []
+                },
+                "enableAcceleratedNetworking": true,
+                "enableIPForwarding": false,
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', parameters('networkSecurityGroups_BB_Frontend_nsg_name'))]"
+                }
+            }
+        }
+    ]
+}
